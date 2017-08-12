@@ -5,8 +5,8 @@ Telegram Bot for statistics and remote management of Claymore's GPU miner.
 
 This bot works with python3 so you need it and pip for installing the module needed.
 ```bash
-sudo pacman -S python3 python3-pip
-sudo apt install python3 python-pip
+sudo pacman -S python3 python-pip
+sudo apt install python3 python3-pip
 ```
 
 Then, you need the module pyTelegramBotAPI.
