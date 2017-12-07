@@ -1,14 +1,21 @@
 # Claymore miner bot
 Telegram Bot for statistics and remote management of Claymore's GPU miner.
 
+# News
+Added the possibility to control multiple rigs and on/off alerts.
+
 # Getting Started
 
 This bot works with python3 so you need it and pip for installing the module needed.
+
+For arch based distributions
 ```bash
 sudo pacman -S python3 python-pip
+```
+For debian based distributions
+```bash
 sudo apt install python3 python3-pip
 ```
-
 Then, you need the module pyTelegramBotAPI.
 ```bash
 sudo pip3 install pyTelegramBotAPI
@@ -17,9 +24,9 @@ Now you need a `Token` from the [BotFather](https://telegram.me/BotFather).
 
 Once you have the `Token` you can configure the bot.
 
-Open miner_bot.py and edit the variables `token`, `miner_ip`, `port` and `my_id`.
+Open config.py and modify the `token`, `my_id` and `rigs`.
 
-Finally, to run the bot you just need to type: `./miner_bot.py`.
+Finally, to run the bot you just need to type: `python3 miner_bot.py`.
 
 # Available Commands
 ```
@@ -30,6 +37,7 @@ Finally, to run the bot you just need to type: `./miner_bot.py`.
 /info - Send miner version and uptime.
 /restart - Restart Claymore's miner.
 /reboot - Reboot the rig(calls reboot.bat or reboot.sh).
+/status - Shows the rig list and their state (on/off).
 /help - Shows this message.
 ```
 # Screenshots
