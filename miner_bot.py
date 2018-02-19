@@ -1,13 +1,12 @@
 #!/usr/bin/python3
-
 import socket
 import json
 import telebot
 import time
 from multiprocessing import Process
 from config import *
-
 bot = telebot.TeleBot(token)
+
 
 def contact_miner(r,ip,port):
     if r == "info":
@@ -53,11 +52,13 @@ def check_status():
             report = ''
         time.sleep(60)
 
+		
+		
 @bot.message_handler(commands=['start','help'])
 def send_commands(message):
     if not is_owner(message):
         return None
-    bot.reply_to(message, "/hashrate - Shows the mining hashrate.\n/main - Shows the main coin hashrate of each GPU.\n/dual - Shows the dual coin hashrate of each GPU.\n/gpu_info - Send the temperature and fan speed of the GPUs.\n/info - Send miner version and uptime.\n/restart - Restart Claymore's miner.\n/reboot - Reboot the rig (calls reboot script in miner folder).\n/status - Shows the rig list and their state (on/off).\n/help - Shows this message.")
+    bot.reply_to(message, "/hashrate - Отображает хешрейт.\n/main - Отображает хешрейт основной валюты по каждой GPU.\n/dual - Отображает хешрейт вторичной валюты по каждой GPU..\n/gpu_info - Отображает Температуру и обороты кулеров GPU.\n/info - Отображает версию майнера и текущее время работы.\n/restart - Перезапуск майнера Claymore\n/reboot - Перезапуск Рига (Вызывает Reboot.bat(sh) из каталога майнера).\n/status - Отображает список и статус ригов(ВКЛ/ВЫКЛ).\n/help - Отображает это сообщение.")
 
 @bot.message_handler(commands=['hashrate'])
 def send_total(message):
@@ -69,12 +70,12 @@ def send_total(message):
         answer = contact_miner("info",rig[1],rig[2])
         if answer != None:
             main_raw=answer[2].split(';')
-            reply += '*Main coin*:\n    Hashrate: {:0.3f} Mh/s\n    Shares found: {}\n    Rejected Shares: {}'.format(int(main_raw[0])/1000, main_raw[1], main_raw[2])
+            reply += '*Основная валюта*:\n    Хэшрейт: {:0.3f} Mh/s\n    Найдено шар: {}\n    Отклоненых шар: {}'.format(int(main_raw[0])/1000, main_raw[1], main_raw[2])
             if len(answer[7].split(";"))==2:
                 dual_raw=answer[4].split(';')
-                reply += '\n*Dual coin*:\n    Hashrate: {:0.3f} Mh/s\n    Shares found: {}\n    Rejected Shares: {}'.format(int(dual_raw[0])/1000, dual_raw[1], dual_raw[2])
+                reply += '\n*Вторичная валюта*:\n    Хэшрейт: {:0.3f} Mh/s\n    Найдено шар: {}\n    Отклоненых шар: {}'.format(int(dual_raw[0])/1000, dual_raw[1], dual_raw[2])
         else:
-            reply += "I am having problems contacting with *{0[0]}*, please check that the *IP {0[1]}* and the *port {0[2]}* are correct.".format(rig)
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
     bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['gpu_info'])
@@ -87,12 +88,12 @@ def send_gpu_info(message):
         answer = contact_miner("info",rig[1],rig[2])
         if answer != None:
             gpus = answer[6].split(';')
-            reply += "*GPU information:*"
+            reply += "*Информация о GPU:*"
             for x in range(0,len(gpus)//2):
-                reply += "\n    *GPU{}:*\n        Temperature: {}ºC\n        Fan Speed: {}%".format(x, gpus[x*2], gpus[x*2+1])
-                #reply += "\n    *GPU{}:* 🌡️{}ºC   🌬️{}%".format(x, gpus[x*2], gpus[x*2+1]) #With EMOJIS instead of text :D
+                reply += "\n    *GPU{}:* 🌡️{}ºC   🌬️{}%".format(x, gpus[x*2], gpus[x*2+1])
+                #reply += "\n    *GPU{}:*\n        Температура: {}ºC\n        Обороты кулера: {}%".format(x, gpus[x*2], gpus[x*2+1])
         else:
-            reply += "I am having problems contacting with *{0[0]}*, please check that the *IP {0[1]}* and the *port {0[2]}* are correct.".format(rig)
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
     bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['main'])
@@ -105,11 +106,11 @@ def send_main_hashrate(message):
         answer = contact_miner("info",rig[1],rig[2])
         if answer != None:
             single = answer[3].split(';')
-            reply += "*Main coin hashrate of each GPU:*"
+            reply += "*Хешрейт основной валюты по каждой GPU:\n*"
             for x, hashrate in enumerate(single):
-                reply += "\n    *GPU{}:* {:0.3f} Mh/s".format(x,float(hashrate)/1000)
+                reply += "\t    *GPU{}:* {:0.3f} Mh/s".format(x,float(hashrate)/1000)
         else:
-            reply += "I am having problems contacting with *{0[0]}*, please check that the *IP {0[1]}* and the *port {0[2]}* are correct.".format(rig)
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
     bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['dual'])
@@ -126,9 +127,9 @@ def send_dual_hashrate(message):
                 if hashrate != 'off':
                     reply += "\n    *GPU{}:* {:0.3f} Mh/s".format(x,float(hashrate)/1000)
                 else:
-                    reply += "\n    *GPU{}:* dual mining is off".format(x)
+                    reply += "\n    *GPU{}:* Дуал майнинг отключен".format(x)
         else:
-            reply += "\nI am having problems contacting with *{0[0]}*, please check that the *IP {0[1]}* and the *port {0[2]}* are correct.".format(rig)
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
     bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['info'])
@@ -141,9 +142,9 @@ def send_info(message):
         answer = contact_miner("info",rig[1],rig[2])
         if answer != None:
             time=int(answer[1])
-            reply += "*Version:* {}\n*Uptime:* {} Days, {} Hours, {} Minutes.".format(answer[0], time//60//24, time//60%24, time%60)
+            reply += "*Версия:* {}\n*Аптайм:* {} Дней, {} Часов, {} Минут.".format(answer[0], time//60//24, time//60%24, time%60)
         else:
-            reply += "I am having problems contacting with *{0[0]}*, please check that the *IP {0[1]}* and the *port {0[2]}* are correct.".format(rig)
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
     bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['status'])
@@ -154,10 +155,10 @@ def status(message):
     for rig in rigs:
         answer = contact_miner("info",rig[1],rig[2])
         if answer != None:
-            status = 'on ✅'
+            status = 'Вкл. ✅'
         else:
-            status = 'off 🔴'
-        reply += "*{}* is {}\n".format(rig[0], status)
+            status = 'Выкл. 🔴'
+        reply += "*{}* сейчас {}\n".format(rig[0], status)
     bot.reply_to(message, reply,parse_mode="markdown")
 
 
@@ -169,18 +170,18 @@ def restart(message):
     reply = ''
     if choose != '':
         if choose == 'all':
-            reply = 'Restarting all the miners'
+            reply = 'Перезапуск майнеров на *ВСЕХ* ригах'
             for rig in rigs:
                 contact_miner("restart_miner",rig[1],rig[2])
         else:
             for rig in rigs:
                 if choose in rig:
                     contact_miner("restart_miner",rig[1],rig[2])
-                    reply = "Restarting *{}*".format(rig[0])
+                    reply = "Перезапуск *{}*".format(rig[0])
     else:
-        reply = "You must enter the name of the rig after /restart or *all* to restart all the miners."
+        reply = "Вы должны ввести имя рига после /restart или *all* для перезапуска майнеров на всех ригах."
     if reply == "":
-        reply = "Sorry, I am not able to find the rig"
+        reply = "Извините я не могу найти данный риг"
     bot.reply_to(message, reply, parse_mode="markdown")
 
 @bot.message_handler(commands=['reboot'])
@@ -191,18 +192,18 @@ def restart(message):
     reply = ''
     if choose != '':
         if choose == 'all':
-            reply = 'Rebooting all the rigs'
+            reply = 'Перезагрузка Всех ригов'
             for rig in rigs:
                 contact_miner("reboot_rig",rig[1],rig[2])
         else:
             for rig in rigs:
                 if choose in rig:
                     contact_miner("reboot_rig",rig[1],rig[2])
-                    reply = "Rebooting *{}*".format(rig[0])
+                    reply = "Перезагрузка *{}*".format(rig[0])
     else:
-        reply = "You must enter the name of the rig after /reboot or *all* to reboot all the rigs."
+        reply = "Вы должны ввести имя рига после /reboot или *all* для перезапуска майнеров на всех ригах."
     if reply == "":
-        reply = "Sorry, I am not able to find the rig"
+        reply = "Извините я не могу найти данный риг"
     bot.reply_to(message, reply, parse_mode="markdown")
 
 
