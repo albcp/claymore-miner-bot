@@ -20,6 +20,7 @@ logger.setLevel(logging.DEBUG)
 
 
 
+
 def contact_miner(r,ip,port):
     if r == "info":
         request = b'{"id":0,"jsonrpc":"2.0","method":"miner_getstat1"}'
@@ -221,6 +222,7 @@ def restart(message):
 
 alarm = Process(target=check_status)
 alarm.start()
+
 
 while True:
     try:
