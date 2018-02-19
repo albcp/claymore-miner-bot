@@ -9,22 +9,9 @@ import sys
 import threading
 import time
 from functools import wraps
-
+from multiprocessing import Process
+from config import *
 import telebot
-
-
-#Token given by BotFather
-token = ''
-
-#IP of the rig (localhost if running bot in the rig)
-miner_ip = 'localhost'
-
-#Port where claymore's miner is listening (default 3333)
-port = 3333
-
-#Your telegram id (You can get it from https://telegram.me/my_id_bot)
-my_id = 0
-
 
 bot = telebot.TeleBot(token)
 
@@ -32,7 +19,8 @@ logger = telebot.logger
 logger.setLevel(logging.DEBUG)
 
 
-def contact_miner(r):
+
+def contact_miner(r,ip,port):
     if r == "info":
         request = b'{"id":0,"jsonrpc":"2.0","method":"miner_getstat1"}'
     elif r == "restart_miner":
@@ -42,7 +30,7 @@ def contact_miner(r):
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.connect((miner_ip, port))
+            s.connect((ip, port))
         except Exception:
             return None
         s.sendall(request)
@@ -50,208 +38,189 @@ def contact_miner(r):
         if data != b'':
             return(json.loads(data.decode('utf-8'))['result'])
 
-
-def smi():
-    cmd = 'nvidia-smi --query-gpu=temperature.gpu,fan.speed,power.draw,clocks.sm,clocks.mem --format=csv,noheader'
-    info = subprocess.getoutput(cmd)
-    lines = info.split('\n') if info else []
-    return [line.split(',') for line in lines]
-
-
-def owner(handler):
-    @wraps(handler)
-    def inner(message):
-        if message.from_user.id == my_id:
-            return handler(message)
-    return inner
+def is_owner(message):
+    if message.from_user.id == my_id:
+        return True
+    else:
+        bot.reply_to(message, "https://github.com/albcp/claymore-miner-bot")
 
 
-def send_error(message):
-    bot.send_message(
-        message.chat.id, 
-        'I am having problems contacting with the rig, please check that the *IP* and the *port* are correct.',
-        parse_mode='markdown'
-    )
+def check_status():
+    rigs_status = {}
+    while(True):
+        report = ''
+        for rig in rigs:
+            answer = contact_miner("info",rig[1],rig[2])
+            if answer != None:
+                status = 'on';
+            else:
+                status = 'off';
+            if rig[0] in rigs_status:
+                if rigs_status[rig[0]] != status:
+                    report += '\n*{}* is now *{}*'.format(rig[0], status)
+            rigs_status[rig[0]] = status
+        if report != '':
+            bot.send_message(my_id, report, parse_mode="markdown")
+            report = ''
+        time.sleep(60)
 
-
+		
+		
 @bot.message_handler(commands=['start','help'])
-@owner
-def help_handler(message):
-    help_msg = [
-        '/hashrate - Shows the mining hashrate.',
-        '/main - Shows the main coin hashrate of each GPU.',
-        '/dual - Shows the dual coin hashrate of each GPU.',
-        '/gpu_info - Send the temperature and fan speed of the GPUs.',
-        '/info - Send miner version and uptime.',
-        '/restart - Restart Claymore\'s miner.',
-        '/reboot - Reboot the rig (calls reboot script in miner folder).',
-        '/help - Shows this message.',
-    ]
-
-    bot.send_message(message.chat.id, '\n'.join(help_msg))
-
+def send_commands(message):
+    if not is_owner(message):
+        return None
+    bot.reply_to(message, "/hashrate - Отображает хешрейт.\n/main - Отображает хешрейт основной валюты по каждой GPU.\n/dual - Отображает хешрейт вторичной валюты по каждой GPU..\n/gpu_info - Отображает Температуру и обороты кулеров GPU.\n/info - Отображает версию майнера и текущее время работы.\n/restart - Перезапуск майнера Claymore\n/reboot - Перезапуск Рига (Вызывает Reboot.bat(sh) из каталога майнера).\n/status - Отображает список и статус ригов(ВКЛ/ВЫКЛ).\n/help - Отображает это сообщение.")
 
 @bot.message_handler(commands=['hashrate'])
-@owner
-def hashrate_handler(message):
-    answer = contact_miner('info')
-
-    if answer is not None:
-
-        def hashrate_info(raw):
-            hashrate_format = '\n'.join([
-                '  Hashrate: {} Mh/s',
-                '  Shares found: {}',
-                '  Rejected Shares: {}',
-            ])
-            return(hashrate_format.format(
-                int(raw[0])/1000,
-                raw[1],
-                raw[2],
-            ))
-
-        main_raw = answer[2].split(';')
-        dual_raw = ''
-
-        if len(answer[7].split(';')) == 2:
-            dual_raw = answer[4].split(';')
-
-        msg = '*Main coin*:\n' + hashrate_info(main_raw)
-        if dual_raw:
-            msg += '\n*Dual coin*:\n' + hashrate_info(dual_raw)
-
-        bot.send_message(message.chat.id, msg, parse_mode='markdown')
-
-    else: send_error(message)
-
+def send_total(message):
+    if not is_owner(message):
+        return None
+    reply=''
+    for rig in rigs:
+        reply += "\n\n*⛏" + rig[0] + "⛏*\n"
+        answer = contact_miner("info",rig[1],rig[2])
+        if answer != None:
+            main_raw=answer[2].split(';')
+            reply += '*Основная валюта*:\n    Хэшрейт: {:0.3f} Mh/s\n    Найдено шар: {}\n    Отклоненых шар: {}'.format(int(main_raw[0])/1000, main_raw[1], main_raw[2])
+            if len(answer[7].split(";"))==2:
+                dual_raw=answer[4].split(';')
+                reply += '\n*Вторичная валюта*:\n    Хэшрейт: {:0.3f} Mh/s\n    Найдено шар: {}\n    Отклоненых шар: {}'.format(int(dual_raw[0])/1000, dual_raw[1], dual_raw[2])
+        else:
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
+    bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['gpu_info'])
-@owner
-def gpu_info_handler(message):
-    result = smi()
-    if result:
-        info_format = '\n'.join([
-            '    Temp: {} ºC',
-            '    Fan: {}',
-            '    Power: {}',
-            '    Core: {}',
-            '    Mem: {}',
-        ])
-
-        info = smi()
-
-        msg = '*GPU information:*\n'
-        for n, line in enumerate(info):
-           msg += 'GPU{}:\n{}\n'.format(n, info_format.format(*line))
-
-        bot.send_message(message.chat.id, msg, parse_mode='markdown')
-    else:
-        send_error(message)
-
+def send_gpu_info(message):
+    if not is_owner(message):
+        return None
+    reply=''
+    for rig in rigs:
+        reply += "\n\n*⛏" + rig[0] + "⛏*\n"
+        answer = contact_miner("info",rig[1],rig[2])
+        if answer != None:
+            gpus = answer[6].split(';')
+            reply += "*Информация о GPU:*"
+            for x in range(0,len(gpus)//2):
+                reply += "\n    *GPU{}:* 🌡️{}ºC   🌬️{}%".format(x, gpus[x*2], gpus[x*2+1])
+                #reply += "\n    *GPU{}:*\n        Температура: {}ºC\n        Обороты кулера: {}%".format(x, gpus[x*2], gpus[x*2+1])
+        else:
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
+    bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['main'])
-@owner
-def main_handler(message):
-    answer = contact_miner('info')
-    if answer is not None:
-        single = answer[3].split(';')
-        single_hashrate_main = '*Main coin hashrate of each GPU:*'
-        for x, hashrate in enumerate(single):
-            single_hashrate_main += '\n    *GPU%d:* %0.3f Mh/s' % (x, float(hashrate)/1000)
-        bot.send_message(message.chat.id, single_hashrate_main, parse_mode='markdown')
-    else: 
-        send_error(message)
-
+def send_main_hashrate(message):
+    if not is_owner(message):
+        return None
+    reply=''
+    for rig in rigs:
+        reply += "\n\n*⛏" + rig[0] + "⛏*\n"
+        answer = contact_miner("info",rig[1],rig[2])
+        if answer != None:
+            single = answer[3].split(';')
+            reply += "*Хешрейт основной валюты по каждой GPU:\n*"
+            for x, hashrate in enumerate(single):
+                reply += "\t    *GPU{}:* {:0.3f} Mh/s".format(x,float(hashrate)/1000)
+        else:
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
+    bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['dual'])
-@owner
-def dual_handler(message):
-    answer = contact_miner('info')
-    if answer != None:
-        single = answer[5].split(';')
-        single_hashrate_dual = '*Dual coin hashrate of each GPU:*'
-        for x, hashrate in enumerate(single):
-            try:
-                hashrate = '%0.3f Mh/s' % float(hashrate) / 1000
-            except ValueError:
-                pass
-            single_hashrate_dual += '\n    *GPU%d:* %s' % (x, hashrate)
-        bot.send_message(message.chat.id, single_hashrate_dual, parse_mode='markdown')
-    else:
-        send_error(message)
-
+def send_dual_hashrate(message):
+    if not is_owner(message):
+        return None
+    reply=''
+    for rig in rigs:
+        reply += "\n\n*⛏" + rig[0] + "⛏*"
+        answer = contact_miner("info",rig[1],rig[2])
+        if answer != None:
+            single = answer[5].split(';')
+            for x, hashrate in enumerate(single):
+                if hashrate != 'off':
+                    reply += "\n    *GPU{}:* {:0.3f} Mh/s".format(x,float(hashrate)/1000)
+                else:
+                    reply += "\n    *GPU{}:* Дуал майнинг отключен".format(x)
+        else:
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
+    bot.reply_to(message, reply,parse_mode="markdown")
 
 @bot.message_handler(commands=['info'])
-@owner
-def info_handler(message):
-    answer = contact_miner('info')
-    if answer is not None:
-        time = int(answer[1])
-        general_info = \
-            '*Version:* %s\n*Uptime:* %s Days, %s Hours, %s Minutes.' % \
-            (answer[0], time//60//24, time//60%24, time%60)
-        bot.send_message(message.chat.id, general_info, parse_mode='markdown')
-    else:
-        send_error(message)
+def send_info(message):
+    if not is_owner(message):
+        return None
+    reply=''
+    for rig in rigs:
+        reply += "\n\n*⛏" + rig[0] + "⛏*\n"
+        answer = contact_miner("info",rig[1],rig[2])
+        if answer != None:
+            time=int(answer[1])
+            reply += "*Версия:* {}\n*Аптайм:* {} Дней, {} Часов, {} Минут.".format(answer[0], time//60//24, time//60%24, time%60)
+        else:
+            reply += "\nНет соединения с ригом *{0[0]}*, проверьте валидность введенных *IP {0[1]}* и *порта {0[2]}* ".format(rig)
+    bot.reply_to(message, reply,parse_mode="markdown")
+
+@bot.message_handler(commands=['status'])
+def status(message):
+    if not is_owner(message):
+        return None
+    reply=''
+    for rig in rigs:
+        answer = contact_miner("info",rig[1],rig[2])
+        if answer != None:
+            status = 'Вкл. ✅'
+        else:
+            status = 'Выкл. 🔴'
+        reply += "*{}* сейчас {}\n".format(rig[0], status)
+    bot.reply_to(message, reply,parse_mode="markdown")
 
 
 @bot.message_handler(commands=['restart'])
-@owner
 def restart(message):
-    contact_miner('restart_miner')
-    bot.send_message(message.chat.id, 'Restarting miner.', parse_mode='markdown')
-
+    if not is_owner(message):
+        return None
+    choose = message.text[9:]
+    reply = ''
+    if choose != '':
+        if choose == 'all':
+            reply = 'Перезапуск майнеров на *ВСЕХ* ригах'
+            for rig in rigs:
+                contact_miner("restart_miner",rig[1],rig[2])
+        else:
+            for rig in rigs:
+                if choose in rig:
+                    contact_miner("restart_miner",rig[1],rig[2])
+                    reply = "Перезапуск *{}*".format(rig[0])
+    else:
+        reply = "Вы должны ввести имя рига после /restart или *all* для перезапуска майнеров на всех ригах."
+    if reply == "":
+        reply = "Извините я не могу найти данный риг"
+    bot.reply_to(message, reply, parse_mode="markdown")
 
 @bot.message_handler(commands=['reboot'])
-@owner
 def restart(message):
-    contact_miner('reboot_rig')
-    bot.send_message(message.chat.id, 'Rebooting ring.', parse_mode='markdown')
-
-
-def healthcheck():
-    logger.info('Miner healthcheck')
-
-    request = b'{"id":0,"jsonrpc":"2.0","method":"miner_getstat1"}'
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        msg = ''
-
-        try:
-            s.connect((miner_ip, port))
-        except Exception:
-            msg = 'Can\'t connect to miner'
+    if not is_owner(message):
+        return None
+    choose = message.text[8:]
+    reply = ''
+    if choose != '':
+        if choose == 'all':
+            reply = 'Перезагрузка Всех ригов'
+            for rig in rigs:
+                contact_miner("reboot_rig",rig[1],rig[2])
         else:
-            s.sendall(request)
-            data = s.recv(1024)
-            if data != b'':
-                resp = json.loads(data.decode('utf-8'))
-                error = resp['error']
-                if error:
-                    msg = error
-            else:
-                msg = 'Can\'t get stat from miner'
-
-        if msg:
-            logger.error('Helthcheck failed: {}'.format(msg))
-            bot.send_message(my_id, 'Miner got error: {}'.format(msg))
-        else:
-            logger.info('Helthcheck ok')
-
-    global timer
-    timer = threading.Timer(60, healthcheck)
-    timer.start()
+            for rig in rigs:
+                if choose in rig:
+                    contact_miner("reboot_rig",rig[1],rig[2])
+                    reply = "Перезагрузка *{}*".format(rig[0])
+    else:
+        reply = "Вы должны ввести имя рига после /reboot или *all* для перезапуска майнеров на всех ригах."
+    if reply == "":
+        reply = "Извините я не могу найти данный риг"
+    bot.reply_to(message, reply, parse_mode="markdown")
 
 
-timer = threading.Timer(60, healthcheck)
-timer.start()
-
-def signal_handler(signal, frame):
-    timer.cancel()
-    timer.join()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)
+alarm = Process(target=check_status)
+alarm.start()
 
 while True:
     try:
