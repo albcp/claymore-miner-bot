@@ -47,3 +47,53 @@ Finally, to run the bot you just need to type: `python3 miner_bot.py`.
 |start and hashrate|main and dual|
 |<img src="https://user-images.githubusercontent.com/3170731/29235553-fefd3926-7eff-11e7-8ce8-7dd03285927a.png" width="410">|<img src="https://user-images.githubusercontent.com/3170731/29235554-ffffecec-7eff-11e7-96b4-ec131802d2a2.png" width="410">|
 |gpu_info and info|restart|
+
+{RUS}
+# Claymore miner bot
+Telegram Bot для отображения статистики и удаленного управления Claymore Gpu Miner.
+
+# Новости
+Added the possibility to control multiple rigs and on/off alerts.
+Добавлен русский перевод
+# Установка
+
+Этот бот работает на python3 так же вам нужен пакетный менеджер pip.
+
+Для дистрибутивов на arch:
+```bash
+sudo pacman -S python3 python-pip
+```
+для дебианподобных дистрибутивов:
+```bash
+sudo apt install python3 python3-pip
+```
+так-же нужно установить модуль pyTelegramBotAPI.
+```bash
+sudo pip3 install pyTelegramBotAPI
+```
+теперь нужен `Token` от [BotFather](https://telegram.me/BotFather).
+
+теперь когда у вас есть `Token` вы можете настроить бота.
+
+откройте config.py и измените переменные `token`, `my_id` и `rigs`.
+
+В конце нам нужно запустить бот командой: `python3 miner_bot.py`.
+
+# Доступные команды
+```
+/hashrate - Отображает хешрейт.
+/main - Отображает хешрейт основной валюты по каждой GPU.
+/dual - Отображает хешрейт вторичной валюты по каждой GPU..
+/gpu_info - Отображает Температуру и обороты кулеров GPU.
+/info - Отображает версию майнера и текущее время работы.
+/restart - Перезапуск майнера Claymore
+/reboot - Перезапуск Рига (Вызывает Reboot.bat(sh) из каталога майнера).
+/status - Отображает список и статус ригов(ВКЛ/ВЫКЛ).
+/help - Отображает это сообщение.
+```
+# Screenshots
+|   |   |
+|:---:|:---:|
+|<img src="https://github.com/naeternitas/claymore-miner-bot/raw/master/%D0%91%D0%B5%D0%B7%D1%8B%D0%BC%D1%8F%D0%BD%D0%BD%D1%8B%D0%B9.jpg">
+
+
